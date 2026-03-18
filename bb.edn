@@ -1,8 +1,8 @@
-{:paths ["src"]
+{:paths ["src" "test"]
  :deps {org.babashka/cli {:mvn/version "0.8.61"}}
  :tasks
  {:override-builtin true
-  run {:doc "Verify data integrity during sync operations"
-       :task (apply (requiring-resolve 'data_sync_verifier.core/-main) *command-line-args*)}
-  scan {:doc "Scan current directory"
-        :task (apply (requiring-resolve 'data_sync_verifier.core/-main) ["--dir" "."])}}}
+  run  {:doc "Verify data integrity during sync operations"
+        :task (apply (requiring-resolve 'data_sync_verifier.core/-main) *command-line-args*)}
+  test {:doc "Run tests"
+        :task (apply (requiring-resolve 'data_sync_verifier.core-test/-main) *command-line-args*)}}}
