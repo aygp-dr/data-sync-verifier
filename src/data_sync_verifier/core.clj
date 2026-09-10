@@ -197,8 +197,8 @@
                         (if (empty? (:summary report))
                           "No issues"
                           (str/join ", "
-                                   (map (fn [[k v]] (format "%s: %d" (name k) v))
-                                        (:summary report)))))]))))
+                                    (map (fn [[k v]] (format "%s: %d" (name k) v))
+                                         (:summary report)))))]))))
 
 ;;; Entry point
 
