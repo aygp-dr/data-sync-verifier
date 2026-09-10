@@ -3,6 +3,7 @@
             [babashka.fs :as fs]
             [clojure.string :as str]
             [clojure.set :as set]
+            [clojure.pprint]
             [cheshire.core :as json]))
 
 (def cli-spec
