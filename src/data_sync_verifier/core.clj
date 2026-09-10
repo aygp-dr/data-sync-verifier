@@ -29,7 +29,7 @@
 ;;; CSV helpers
 
 (defn parse-csv-line [line]
-  (mapv str/trim (str/split line #",")))
+  (mapv str/trim (str/split line #"," -1)))
 
 (s/fdef parse-csv-line
   :args (s/cat :line ::specs/csv-line)

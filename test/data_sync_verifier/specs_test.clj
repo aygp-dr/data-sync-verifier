@@ -16,15 +16,8 @@
     `sut/line-diffs `sut/check-file-pair `sut/compare-directories
     `sut/compare-files `sut/-main})
 
-;; TODO(spec): (parse-csv-line "id,") => ["id"]. str/split drops trailing
-;; empty fields, so a header that gains an empty last column ("id,name,")
-;; compares equal to "id,name" and no schema-mismatch is reported.
-(def ^:private known-failing
-  #{`sut/parse-csv-line})
-
 (defn- checkable []
-  (remove (into side-effecting known-failing)
-          (stest/enumerate-namespace 'data_sync_verifier.core)))
+  (remove side-effecting (stest/enumerate-namespace 'data_sync_verifier.core)))
 
 (deftest fdefs-hold-under-generative-testing
   (let [results (stest/check (checkable) check-opts)]

@@ -175,6 +175,18 @@
           (is (contains? types :schema-mismatch))
           (is (contains? types :row-count-mismatch)))))))
 
+(deftest test-csv-trailing-empty-column
+  (testing "An empty last column is still a column"
+    (is (= ["id" "name" ""] (core/parse-csv-line "id,name,")))
+    (with-temp-dirs
+      (fn [src tgt]
+        (write-file! src "data.csv" "id,name\n1,Alice\n")
+        (write-file! tgt "data.csv" "id,name,\n1,Alice,\n")
+        (let [issues (core/compare-directories src tgt)
+              schema (filter #(= :schema-mismatch (:type %)) issues)]
+          (is (= 1 (count schema)))
+          (is (= ["id" "name" ""] (:target-headers (first schema)))))))))
+
 (defn -main [& _args]
   (let [{:keys [fail error]} (run-tests 'data_sync_verifier.core-test)]
     (System/exit (if (pos? (+ fail error)) 1 0))))
