@@ -6,7 +6,7 @@
             [clojure.set :as set]
             [clojure.pprint]
             [cheshire.core :as json]
-            [data-sync-verifier.specs :as specs]))
+            [data_sync_verifier.specs :as specs]))
 
 (def cli-spec
   {:source {:desc "Source directory or file" :alias :s}

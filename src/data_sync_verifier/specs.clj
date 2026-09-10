@@ -1,4 +1,4 @@
-(ns data-sync-verifier.specs
+(ns data_sync_verifier.specs
   "Data specs for data-sync-verifier (https://clojure.org/guides/spec).
   Function specs (s/fdef) live next to each defn in data_sync_verifier.core."
   (:require [clojure.spec.alpha :as s]

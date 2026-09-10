@@ -1,11 +1,11 @@
-(ns data-sync-verifier.specs-test
+(ns data_sync_verifier.specs-test
   "Generative checks for every pure s/fdef'd fn, plus data-spec sanity.
   Per https://clojure.org/guides/spec (Testing)."
   (:require [clojure.spec.alpha :as s]
             [clojure.spec.test.alpha :as stest]
             [clojure.test :refer [deftest is testing]]
             [data_sync_verifier.core :as sut]
-            [data-sync-verifier.specs :as specs]))
+            [data_sync_verifier.specs :as specs]))
 
 (def ^:private check-opts {:clojure.spec.test.check/opts {:num-tests 50}})
 
