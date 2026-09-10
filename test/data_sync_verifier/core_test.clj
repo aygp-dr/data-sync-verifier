@@ -1,9 +1,14 @@
 (ns data_sync_verifier.core-test
-  (:require [clojure.test :refer [deftest is testing run-tests]]
+  (:require [clojure.spec.test.alpha :as stest]
+            [clojure.test :refer [deftest is testing run-tests use-fixtures]]
             [data_sync_verifier.core :as core]
             [babashka.fs :as fs]
             [clojure.string :as str]
             [cheshire.core :as json]))
+
+;; Exercise every s/fdef :args spec while the unit tests run.
+(use-fixtures :once
+  (fn [f] (stest/instrument) (try (f) (finally (stest/unstrument)))))
 
 (defn with-temp-dirs
   "Create two temp dirs, call f with [source-dir target-dir], clean up after."
@@ -169,6 +174,18 @@
           (is (contains? types :content-drift))
           (is (contains? types :schema-mismatch))
           (is (contains? types :row-count-mismatch)))))))
+
+(deftest test-csv-trailing-empty-column
+  (testing "An empty last column is still a column"
+    (is (= ["id" "name" ""] (core/parse-csv-line "id,name,")))
+    (with-temp-dirs
+      (fn [src tgt]
+        (write-file! src "data.csv" "id,name\n1,Alice\n")
+        (write-file! tgt "data.csv" "id,name,\n1,Alice,\n")
+        (let [issues (core/compare-directories src tgt)
+              schema (filter #(= :schema-mismatch (:type %)) issues)]
+          (is (= 1 (count schema)))
+          (is (= ["id" "name" ""] (:target-headers (first schema)))))))))
 
 (defn -main [& _args]
   (let [{:keys [fail error]} (run-tests 'data_sync_verifier.core-test)]

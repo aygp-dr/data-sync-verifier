@@ -1,9 +1,12 @@
 (ns data_sync_verifier.core
   (:require [babashka.cli :as cli]
             [babashka.fs :as fs]
+            [clojure.spec.alpha :as s]
             [clojure.string :as str]
             [clojure.set :as set]
-            [cheshire.core :as json]))
+            [clojure.pprint]
+            [cheshire.core :as json]
+            [data_sync_verifier.specs :as specs]))
 
 (def cli-spec
   {:source {:desc "Source directory or file" :alias :s}
@@ -19,10 +22,22 @@
         digest (.digest md bytes)]
     (apply str (map #(format "%02x" (bit-and % 0xff)) digest))))
 
+(s/fdef md5-checksum
+  :args (s/cat :file-path ::specs/path-like)
+  :ret ::specs/checksum)
+
 ;;; CSV helpers
 
 (defn parse-csv-line [line]
-  (mapv str/trim (str/split line #",")))
+  (mapv str/trim (str/split line #"," -1)))
+
+(s/fdef parse-csv-line
+  :args (s/cat :line ::specs/csv-line)
+  :ret ::specs/csv-fields
+  :fn (fn [{{:keys [line]} :args ret :ret}]
+        ;; one field per comma-separated cell, each trimmed
+        (and (= (count ret) (inc (count (filter #{\,} line))))
+             (every? #(= % (str/trim %)) ret))))
 
 (defn read-csv [file-path]
   (let [lines     (str/split-lines (slurp (str file-path)))
@@ -32,10 +47,18 @@
        :rows      (mapv parse-csv-line (rest non-empty))
        :row-count (max 0 (dec (count non-empty)))})))
 
+(s/fdef read-csv
+  :args (s/cat :file-path ::specs/path-like)
+  :ret (s/nilable ::specs/csv))
+
 ;;; JSON helpers
 
 (defn read-json-file [file-path]
   (json/parse-string (slurp (str file-path)) true))
+
+(s/fdef read-json-file
+  :args (s/cat :file-path ::specs/path-like)
+  :ret any?)
 
 ;;; Directory listing
 
@@ -45,6 +68,10 @@
          (filter fs/regular-file?)
          (map #(str (fs/relativize dir-path %)))
          (into (sorted-set)))))
+
+(s/fdef relative-paths
+  :args (s/cat :dir ::specs/path-like)
+  :ret (s/and (s/coll-of string? :kind set?) sorted?))
 
 ;;; Content diff
 
@@ -61,6 +88,10 @@
                  (if (= s t)
                    diffs
                    (conj diffs {:line (inc i) :source s :target t}))))))))
+
+(s/fdef line-diffs
+  :args (s/cat :source-path ::specs/path-like :target-path ::specs/path-like)
+  :ret (s/coll-of ::specs/line-diff :kind vector?))
 
 ;;; File-pair checks
 
@@ -114,6 +145,10 @@
         (catch Exception _)))
     @issues))
 
+(s/fdef check-file-pair
+  :args (s/cat :source-file ::specs/path-like :target-file ::specs/path-like :rel-path string?)
+  :ret ::specs/issues)
+
 ;;; Directory comparison
 
 (defn compare-directories [source target]
@@ -138,10 +173,18 @@
         (swap! issues into file-issues)))
     @issues))
 
+(s/fdef compare-directories
+  :args (s/cat :source ::specs/path-like :target ::specs/path-like)
+  :ret ::specs/issues)
+
 ;;; File comparison
 
 (defn compare-files [source target]
   (check-file-pair (str source) (str target) (str (fs/file-name (fs/path source)))))
+
+(s/fdef compare-files
+  :args (s/cat :source ::specs/path-like :target ::specs/path-like)
+  :ret ::specs/issues)
 
 ;;; Report building
 
@@ -153,6 +196,14 @@
    :in-sync?     (empty? issues)
    :summary      (into (sorted-map) (frequencies (map :type issues)))
    :issues       (vec issues)})
+
+(s/fdef build-report
+  :args (s/cat :source ::specs/source :target ::specs/target :issues ::specs/issues)
+  :ret ::specs/report
+  :fn (fn [{{:keys [issues]} :args ret :ret}]
+        (and (= (count issues) (:total-issues ret))
+             (= (empty? issues) (:in-sync? ret))
+             (= (count issues) (reduce + 0 (vals (:summary ret)))))))
 
 ;;; Report formatting
 
@@ -170,6 +221,12 @@
     :row-count-mismatch (format "  ROWCOUNT  %s  src:%d tgt:%d"
                                 (:file issue) (:source-rows issue) (:target-rows issue))
     (format "  UNKNOWN   %s" (pr-str issue))))
+
+(s/fdef format-issue-text
+  :args (s/cat :issue ::specs/issue)
+  :ret string?
+  :fn (fn [{{:keys [issue]} :args ret :ret}]
+        (str/includes? ret (:file issue))))
 
 (defn format-report [report fmt]
   (case fmt
@@ -196,8 +253,17 @@
                         (if (empty? (:summary report))
                           "No issues"
                           (str/join ", "
-                                   (map (fn [[k v]] (format "%s: %d" (name k) v))
-                                        (:summary report)))))]))))
+                                    (map (fn [[k v]] (format "%s: %d" (name k) v))
+                                         (:summary report)))))]))))
+
+(s/fdef format-report
+  :args (s/cat :report ::specs/report :fmt ::specs/format)
+  :ret string?
+  :fn (fn [{{:keys [report fmt]} :args ret :ret}]
+        (case fmt
+          "json" (= (:total-issues report) (:total-issues (json/parse-string ret true)))
+          "edn"  (= report (read-string ret))
+          (= (:in-sync? report) (str/includes? ret "Status: IN SYNC")))))
 
 ;;; Entry point
 
@@ -237,6 +303,9 @@
             report (build-report source target issues)]
         (println (format-report report fmt))
         (System/exit (if (:in-sync? report) 0 1))))))
+
+(s/fdef -main
+  :args (s/* string?))
 
 (when (= *file* (System/getProperty "babashka.file"))
   (apply -main *command-line-args*))
