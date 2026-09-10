@@ -1,9 +1,14 @@
 (ns data_sync_verifier.core-test
-  (:require [clojure.test :refer [deftest is testing run-tests]]
+  (:require [clojure.spec.test.alpha :as stest]
+            [clojure.test :refer [deftest is testing run-tests use-fixtures]]
             [data_sync_verifier.core :as core]
             [babashka.fs :as fs]
             [clojure.string :as str]
             [cheshire.core :as json]))
+
+;; Exercise every s/fdef :args spec while the unit tests run.
+(use-fixtures :once
+  (fn [f] (stest/instrument) (try (f) (finally (stest/unstrument)))))
 
 (defn with-temp-dirs
   "Create two temp dirs, call f with [source-dir target-dir], clean up after."
